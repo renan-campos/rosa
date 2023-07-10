@@ -310,8 +310,8 @@ func init() {
 		&args.tags,
 		"tags",
 		nil,
-		"Apply user defined tags to all resources created by ROSA in AWS."+
-			"Tags are comma separated, for example: 'foo:bar,bar:baz'",
+		"Apply user defined tags to all resources created by ROSA in AWS. "+
+			"Tags are comma separated, for example: 'key value, foo bar'",
 	)
 
 	flags.BoolVar(
@@ -1448,6 +1448,7 @@ func run(cmd *cobra.Command, _ []string) {
 		}
 	}
 	if len(tags) > 0 {
+		delim := aws.GetTagsDelimiter(tags)
 		duplicate, found := aws.HasDuplicateTagKey(tags)
 		if found {
 			r.Reporter.Errorf("Invalid tags, user tag keys must be unique, duplicate key '%s' found", duplicate)
@@ -1459,7 +1460,7 @@ func run(cmd *cobra.Command, _ []string) {
 				r.Reporter.Errorf("%s", err)
 				os.Exit(1)
 			}
-			t := strings.Split(tag, ":")
+			t := strings.Split(tag, delim)
 			tagsList[t[0]] = strings.TrimSpace(t[1])
 		}
 	}
@@ -2957,11 +2958,7 @@ func buildCommand(spec ocm.Spec, operatorRolesPrefix string,
 		command += fmt.Sprintf(" --%s", ClassicOidcConfigFlag)
 	}
 	if len(spec.Tags) > 0 {
-		tags := []string{}
-		for k, v := range spec.Tags {
-			tags = append(tags, fmt.Sprintf("%s:%s", k, v))
-		}
-		command += fmt.Sprintf(" --tags %s", strings.Join(tags, ","))
+		command += fmt.Sprintf(" --tags \"%s\"", strings.Join(buildTagsCommand(spec.Tags), ","))
 	}
 	if spec.MultiAZ && !spec.Hypershift.Enabled {
 		command += " --multi-az"
@@ -3092,6 +3089,24 @@ func buildCommand(spec ocm.Spec, operatorRolesPrefix string,
 	}
 
 	return command
+}
+
+func buildTagsCommand(tags map[string]string) []string {
+	// set correct delim, if a key or value contains `:` the delim should be " "
+	delim := ":"
+	for k, v := range tags {
+		if strings.Contains(k, ":") || strings.Contains(v, ":") {
+			delim = " "
+			break
+		}
+	}
+
+	// build list of formatted tags to return in command
+	var formattedTags []string
+	for k, v := range tags {
+		formattedTags = append(formattedTags, fmt.Sprintf("%s%s%s", k, delim, v))
+	}
+	return formattedTags
 }
 
 func getRolePrefix(clusterName string) string {
