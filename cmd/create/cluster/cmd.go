@@ -3063,20 +3063,20 @@ func buildCommand(spec ocm.Spec, operatorRolesPrefix string,
 
 	if !reflect.DeepEqual(spec.DefaultIngress, ocm.DefaultIngressSpec{}) {
 		if len(spec.DefaultIngress.RouteSelectors) != 0 {
-			selectors := []string{}
+			command += fmt.Sprintf(" --%s \"", defaultIngressRouteSelectorFlag)
 			for k, v := range spec.DefaultIngress.RouteSelectors {
-				selectors = append(selectors, fmt.Sprintf("%s=%s", k, v))
+				command += fmt.Sprintf("%s=%s", k, v)
 			}
-			command += fmt.Sprintf(" --%s %s", defaultIngressRouteSelectorFlag, strings.Join(selectors, ","))
+			command += "\""
 		}
 		if len(spec.DefaultIngress.ExcludedNamespaces) != 0 {
 			command += fmt.Sprintf(" --%s %s", defaultIngressExcludedNamespacesFlag,
 				strings.Join(spec.DefaultIngress.ExcludedNamespaces, ","))
 		}
-		if !helper.Contains([]string{"", "none"}, spec.DefaultIngress.WildcardPolicy) {
+		if spec.DefaultIngress.WildcardPolicy != "" {
 			command += fmt.Sprintf(" --%s %s", defaultIngressWildcardPolicyFlag, spec.DefaultIngress.WildcardPolicy)
 		}
-		if !helper.Contains([]string{"", "none"}, spec.DefaultIngress.NamespaceOwnershipPolicy) {
+		if spec.DefaultIngress.NamespaceOwnershipPolicy != "" {
 			command += fmt.Sprintf(" --%s %s", defaultIngressNamespaceOwnershipPolicyFlag,
 				spec.DefaultIngress.NamespaceOwnershipPolicy)
 		}
