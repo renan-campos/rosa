@@ -27,6 +27,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
+	helper "github.com/openshift/rosa/pkg/ingress"
 	"github.com/openshift/rosa/pkg/interactive"
 	"github.com/openshift/rosa/pkg/ocm"
 	"github.com/openshift/rosa/pkg/rosa"
@@ -37,10 +38,6 @@ import (
 var ingressKeyRE = regexp.MustCompile(`^[a-z0-9]{3,5}$`)
 
 var validLbTypes = []string{string(cmv1.LoadBalancerFlavorClassic), string(cmv1.LoadBalancerFlavorNlb)}
-var ValidWildcardPolicies = []string{string(cmv1.WildcardPolicyWildcardsDisallowed),
-	string(cmv1.WildcardPolicyWildcardsAllowed)}
-var ValidNamespaceOwnershipPolicies = []string{string(cmv1.NamespaceOwnershipPolicyStrict),
-	string(cmv1.NamespaceOwnershipPolicyInterNamespaceAllowed)}
 
 var Cmd = &cobra.Command{
 	Use:     "ingress ID",
@@ -148,7 +145,7 @@ func init() {
 		&args.wildcardPolicy,
 		wildcardPolicyFlag,
 		"",
-		fmt.Sprintf("Wildcard Policy for ingress. Options are %s", strings.Join(ValidWildcardPolicies, ",")),
+		fmt.Sprintf("Wildcard Policy for ingress. Options are %s", strings.Join(helper.ValidWildcardPolicies, ",")),
 	)
 
 	flags.StringVar(
@@ -156,7 +153,7 @@ func init() {
 		namespaceOwnershipPolicyFlag,
 		"",
 		fmt.Sprintf("Namespace Ownership Policy for ingress. Options are %s",
-			strings.Join(ValidNamespaceOwnershipPolicies, ",")),
+			strings.Join(helper.ValidNamespaceOwnershipPolicies, ",")),
 	)
 
 	flags.StringVar(
@@ -185,12 +182,12 @@ func lbTypeCompletion(cmd *cobra.Command, args []string, toComplete string) ([]s
 
 func namespaceOwnershipPoliciesTypeCompletion(cmd *cobra.Command,
 	args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-	return ValidNamespaceOwnershipPolicies, cobra.ShellCompDirectiveDefault
+	return helper.ValidNamespaceOwnershipPolicies, cobra.ShellCompDirectiveDefault
 }
 
 func wildcardPoliciesTypeCompletion(cmd *cobra.Command,
 	args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-	return ValidWildcardPolicies, cobra.ShellCompDirectiveDefault
+	return helper.ValidWildcardPolicies, cobra.ShellCompDirectiveDefault
 }
 
 func run(cmd *cobra.Command, argv []string) {
@@ -314,7 +311,7 @@ func run(cmd *cobra.Command, argv []string) {
 		if interactive.Enabled() && !ocm.IsHyperShiftCluster(cluster) {
 			wildcardPolicyArg, err := interactive.GetOption(interactive.Input{
 				Question: "Wildcard Policy",
-				Options:  ValidWildcardPolicies,
+				Options:  helper.ValidWildcardPolicies,
 				Help:     cmd.Flags().Lookup(wildcardPolicyFlag).Usage,
 				Default:  args.wildcardPolicy,
 			})
@@ -337,7 +334,7 @@ func run(cmd *cobra.Command, argv []string) {
 		if interactive.Enabled() && !ocm.IsHyperShiftCluster(cluster) {
 			namespaceOwnershipPolicyArg, err := interactive.GetOption(interactive.Input{
 				Question: "Namespace Ownership Policy",
-				Options:  ValidNamespaceOwnershipPolicies,
+				Options:  helper.ValidNamespaceOwnershipPolicies,
 				Help:     cmd.Flags().Lookup(namespaceOwnershipPolicyFlag).Usage,
 				Default:  args.namespaceOwnershipPolicy,
 			})
@@ -456,7 +453,7 @@ func run(cmd *cobra.Command, argv []string) {
 	if routeSelector != nil {
 		routeSelectors := map[string]string{}
 		if *routeSelector != "" {
-			routeSelectors, err = GetRouteSelector(*routeSelector)
+			routeSelectors, err = helper.GetRouteSelector(*routeSelector)
 			if err != nil {
 				r.Reporter.Errorf("%s", err)
 				os.Exit(1)
@@ -535,21 +532,4 @@ func run(cmd *cobra.Command, argv []string) {
 		os.Exit(1)
 	}
 	r.Reporter.Infof("Updated ingress '%s' on cluster '%s'", ingress.ID(), clusterKey)
-}
-
-func GetRouteSelector(labelMatches string) (map[string]string, error) {
-	routeSelectors := make(map[string]string)
-	if labelMatches == "" {
-		return routeSelectors, nil
-	}
-
-	for _, labelMatch := range strings.Split(labelMatches, ",") {
-		if !strings.Contains(labelMatch, "=") {
-			return nil, fmt.Errorf("Expected key=value format for label-match")
-		}
-		tokens := strings.Split(labelMatch, "=")
-		routeSelectors[strings.TrimSpace(tokens[0])] = strings.TrimSpace(tokens[1])
-	}
-
-	return routeSelectors, nil
 }

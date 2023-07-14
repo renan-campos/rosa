@@ -37,7 +37,6 @@ import (
 	"github.com/openshift/rosa/cmd/create/oidcprovider"
 	"github.com/openshift/rosa/cmd/create/operatorroles"
 	clusterdescribe "github.com/openshift/rosa/cmd/describe/cluster"
-	"github.com/openshift/rosa/cmd/edit/ingress"
 	installLogs "github.com/openshift/rosa/cmd/logs/install"
 	"github.com/openshift/rosa/pkg/arguments"
 	"github.com/openshift/rosa/pkg/aws"
@@ -45,6 +44,7 @@ import (
 	"github.com/openshift/rosa/pkg/helper"
 	"github.com/openshift/rosa/pkg/helper/roles"
 	"github.com/openshift/rosa/pkg/helper/versions"
+	"github.com/openshift/rosa/pkg/ingress"
 	"github.com/openshift/rosa/pkg/interactive"
 	"github.com/openshift/rosa/pkg/interactive/confirm"
 	"github.com/openshift/rosa/pkg/ocm"
@@ -2390,16 +2390,22 @@ func run(cmd *cobra.Command, _ []string) {
 		}
 		routeSelector = args.defaultIngressRouteSelectors
 	} else if interactive.Enabled() && !isHostedCP {
-		routeSelectorArg, err := interactive.GetString(interactive.Input{
+		var err error
+		routeSelector, err = interactive.GetString(interactive.Input{
 			Question: "Route Selector for ingress",
 			Help:     cmd.Flags().Lookup(defaultIngressRouteSelectorFlag).Usage,
 			Default:  args.defaultIngressRouteSelectors,
+			Validators: []interactive.Validator{
+				func(routeSelector interface{}) error {
+					_, err := ingress.GetRouteSelector(routeSelector.(string))
+					return err
+				},
+			},
 		})
 		if err != nil {
 			r.Reporter.Errorf("Expected a valid comma-separated list of attributes: %s", err)
 			os.Exit(1)
 		}
-		routeSelector = routeSelectorArg
 	}
 	routeSelectors, err := ingress.GetRouteSelector(routeSelector)
 	if err != nil {
